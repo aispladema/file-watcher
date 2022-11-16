@@ -14,16 +14,12 @@ import (
 
 var watcher *fsnotify.Watcher
 var fileToWatch *os.File
-var isPublicCamera bool
 
 func sendFileData(fileName string, cameraId string) {
 	body := map[string]interface{}{
 		"filename": fileName,
 		"state":    "uploaded",
 		"cameraId": cameraId,
-	}
-	if !isPublicCamera {
-		body["userId"] = os.Args[5]
 	}
 	requestURL := os.Getenv("MANAGER") + "/api/events/file"
 	byts, _ := json.Marshal(body)
@@ -40,55 +36,42 @@ func sendFileData(fileName string, cameraId string) {
 
 func main() {
 	//Check if received folder to watch
-	if len(os.Args) > 4 {
-		if len(os.Args) == 5 {
-			isPublicCamera = true
-		} else if len(os.Args) == 6 {
-			isPublicCamera = false
-		} else {
-			fmt.Printf("Too much arguments were found")
-			return
-		}
+	folderToWatch := os.Args[1]
 
-		folderToWatch := os.Args[1]
+	//Creates a new file watcher
+	watcher, _ = fsnotify.NewWatcher()
+	defer watcher.Close()
 
-		//Creates a new file watcher
-		watcher, _ = fsnotify.NewWatcher()
-		defer watcher.Close()
-
-		//Check if the argument is a valid folder
-		if err := filepath.Walk(folderToWatch, watchDir); err != nil {
-			fmt.Println("ERROR", err)
-		}
-
-		defer fileToWatch.Close()
-
-		done := make(chan bool)
-
-		go func() {
-			fileLineScanner := bufio.NewReader(fileToWatch)
-			cameraId := os.Args[4]
-			for {
-				select {
-				//Watch for events
-				case event := <-watcher.Events:
-					if event.Op == fsnotify.Write {
-						fileName, _, _ := fileLineScanner.ReadLine()
-						if string(fileName) != "" {
-							sendFileData(string(fileName), cameraId)
-						}
-					}
-				//Watch for errors
-				case err := <-watcher.Errors:
-					fmt.Println("ERROR", err)
-				}
-			}
-		}()
-
-		<-done
+	//Check if the argument is a valid folder
+	if err := filepath.Walk(folderToWatch, watchDir); err != nil {
+		fmt.Println("ERROR", err)
 	}
-	fmt.Println("There's enough atributes to start the process")
-	return
+
+	defer fileToWatch.Close()
+
+	done := make(chan bool)
+
+	go func() {
+		fileLineScanner := bufio.NewReader(fileToWatch)
+		cameraId := os.Args[2]
+		for {
+			select {
+			//Watch for events
+			case event := <-watcher.Events:
+				if event.Op == fsnotify.Write {
+					fileName, _, _ := fileLineScanner.ReadLine()
+					if string(fileName) != "" {
+						sendFileData(string(fileName), cameraId)
+					}
+				}
+			//Watch for errors
+			case err := <-watcher.Errors:
+				fmt.Println("ERROR", err)
+			}
+		}
+	}()
+
+	<-done
 }
 
 // This gets run as a walk func, searching for directories to add watchers to
