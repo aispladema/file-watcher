@@ -58,6 +58,7 @@ func main() {
 			select {
 			//Watch for events
 			case event := <-watcher.Events:
+				fmt.Println("INFO: Event ", event)
 				if event.Op == fsnotify.Write {
 					fileName, _, _ := fileLineScanner.ReadLine()
 					if string(fileName) != "" {
@@ -77,6 +78,7 @@ func main() {
 // This gets run as a walk func, searching for directories to add watchers to
 func watchDir(path string, fi os.FileInfo, err error) error {
 	//Check if the file exists
+	fmt.Println("INFO: Watching directory: ", path)
 	if _, fileNotExistsError := os.Stat(path); fileNotExistsError != nil || os.IsNotExist(fileNotExistsError) {
 		_, fileCreationError := os.Create(path)
 		if fileCreationError != nil {
